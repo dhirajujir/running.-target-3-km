@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>RUNNING TARGET 3 KM • LIVE GPS RACE</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}
+body{background:#070b12;color:#fff;min-height:100vh}
+header{background:linear-gradient(135deg,#ff6b00,#ff1f00);padding:20px 15px;text-align:center;box-shadow:0 5px 25px #ff450055}
+header h1{font-size:27px;font-weight:900;letter-spacing:1px}
+header p{margin-top:6px;font-size:14px}
+.container{width:100%;max-width:1100px;margin:auto;padding:15px}
+.card{background:#101722;border:1px solid #243044;border-radius:18px;padding:16px;margin-bottom:15px;box-shadow:0 8px 30px #0008}
+.section-title{font-size:19px;font-weight:900;margin-bottom:12px}
+select,button{width:100%;padding:14px;border-radius:12px;border:none;font-size:16px;font-weight:800}
+select{background:#182232;color:#fff;border:1px solid #34445c;margin-bottom:10px}
+button{background:linear-gradient(135deg,#00e676,#00a152);color:#fff;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+.stop-btn{background:linear-gradient(135deg,#ff3d3d,#b40000);margin-top:10px}
+.status{text-align:center;padding:10px;border-radius:10px;margin-top:10px;background:#172130;font-size:14px}
+.status.running{color:#00ff88}.status.paused{color:#ffd600}.status.finished{color:#00e5ff}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
+.stat{background:#182232;padding:13px;border-radius:12px;text-align:center}
+.stat small{display:block;color:#8fa0b8;font-size:11px;margin-bottom:5px}.stat strong{font-size:20px}
+.progress-box{margin-top:12px}.progress-bg{height:14px;background:#273246;border-radius:20px;overflow:hidden}
+.progress{height:100%;width:0%;background:linear-gradient(90deg,#00e676,#00c853,#ffd600);transition:.3s}
+.progress-text{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#aab7c8}
+#map{height:450px;width:100%;border-radius:15px;overflow:hidden}
+.leaderboard{display:flex;flex-direction:column;gap:8px}
+.runner-row{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;background:#182232;padding:12px;border-radius:14px}
+.rank{width:35px;height:35px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#26364d;font-weight:900}
+.runner-name{font-weight:900}.runner-info{color:#94a4b9;font-size:12px;margin-top:3px}
+.runner-distance{text-align:right;font-weight:900}.runner-distance small{display:block;color:#8fa0b8;font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.legend-item{display:flex;align-items:center;gap:5px;background:#172130;padding:7px 10px;border-radius:20px;font-size:12px}
+.dot{width:10px;height:10px;border-radius:50%}
+.footer{text-align:center;color:#6e7d92;padding:20px;font-size:12px}
+.live-badge{display:inline-flex;align-items:center;gap:6px;background:#071d13;color:#00ff88;padding:6px 10px;border-radius:20px;font-size:12px;font-weight:bold}
+.live-dot{width:8px;height:8px;background:#00ff88;border-radius:50%;animation:pulse 1s infinite}
+.notice{font-size:12px;color:#9fb0c5;line-height:1.5;margin-top:10px}
+.emergency-box{border:1px solid #4a3a65;background:#121225}
+.speaker{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#aebbd0}
+@keyframes pulse{50%{opacity:.35;transform:scale(.96)}}
+.leaflet-popup-content{color:#111;font-weight:bold}
+@media(max-width:600px){header h1{font-size:23px}#map{height:390px}.stats{grid-template-columns:repeat(2,1fr)}.runner-row{grid-template-columns:38px 1fr auto}.runner-distance{font-size:14px}}
+</style>
+</head>
+<body>
+<header>
+<h1>🇮🇳 RUNNING TARGET 3 KM 🇮🇳</h1>
+<p>18 AUGUST 2026 • LIVE GPS RACE</p>
+</header>
+
+<div class="container">
+<div class="card">
+<div class="section-title">🏃 PARTICIPANT</div>
+<select id="runnerSelect">
+<option value="">Select Your Name</option>
+<option value="bhargav">Bhargav Boruah</option>
+<option value="dhiraj">Dhiraj Ujir</option>
+<option value="ranjan">Ranjan Boruah</option>
+<option value="gunakanta">Gunakanta Gogoi</option>
+<option value="palash">Palash Chabukdhara</option>
+</select>
+<button id="startBtn">🚀 START / RESUME 3 KM RACE</button>
+<button id="stopBtn" class="stop-btn" disabled>⏸ STOP / PAUSE</button>
+<div id="status" class="status">Select your name and start the race.</div>
+
+<div class="stats">
+<div class="stat"><small>DISTANCE</small><strong id="myDistance">0.00 KM</strong></div>
+<div class="stat"><small>TIME</small><strong id="myTime">00:00</strong></div>
+<div class="stat"><small>PACE</small><strong id="myPace">--</strong></div>
+<div class="stat"><small>REMAINING</small><strong id="myRemaining">3.00 KM</strong></div>
+</div>
+
+<div class="progress-box">
+<div class="progress-bg"><div class="progress" id="myProgress"></div></div>
+<div class="progress-text"><span>START</span><span id="progressText">0%</span><span>3 KM 🏁</span></div>
+</div>
+<div class="notice">📍 Precise GPS permission + Location ON required. Keep this page open while running. Chrome is recommended.</div>
+</div>
+
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<div class="section-title" style="margin:0">🗺️ LIVE RACE MAP</div>
+<div class="live-badge"><span class="live-dot"></span>LIVE</div>
+</div>
+<div id="map"></div>
+<div class="legend">
+<div class="legend-item"><span class="dot" style="background:#00e676"></span>Bhargav</div>
+<div class="legend-item"><span class="dot" style="background:#2196f3"></span>Dhiraj</div>
+<div class="legend-item"><span class="dot" style="background:#e040fb"></span>Ranjan</div>
+<div class="legend-item"><span class="dot" style="background:#ff9800"></span>Gunakanta</div>
+<div class="legend-item"><span class="dot" style="background:#f44336"></span>Palash</div>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">🏆 LIVE LEADERBOARD</div>
+<div id="leaderboard" class="leaderboard">Waiting for runners...</div>
+</div>
+
+<div class="footer">🇮🇳 RUNNING TARGET 3 KM • 18 AUGUST 2026<br>Live GPS Race Tracker</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig={
+ apiKey:"AIzaSyCxs7TFtAc7ZGF3kTOcAgl4E7j1E0RWNDw",
+ authDomain:"running-target-3-km.firebaseapp.com",
+ databaseURL:"https://running-target-3-km-default-rtdb.firebaseio.com",
+ projectId:"running-target-3-km",
+ storageBucket:"running-target-3-km.firebasestorage.app",
+ messagingSenderId:"418435910342",
+ appId:"1:418435910342:web:6f13c73292bc3c16d9d65c7"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+const TARGET_DISTANCE=3;
+const MAX_ACCURACY=100;
+const MIN_MOVE_METERS=2;
+const MAX_SPEED_KMH=40;
+const HEARTBEAT_MS=1000;
+const STALE_MS=8000;
+const LOCAL_KEY="runningTarget3km_selectedRunner_v4";
+
+const runners={
+ bhargav:{name:"Bhargav Boruah",color:"#00e676"},
+ dhiraj:{name:"Dhiraj Ujir",color:"#2196f3"},
+ ranjan:{name:"Ranjan Boruah",color:"#e040fb"},
+ gunakanta:{name:"Gunakanta Gogoi",color:"#ff9800"},
+ palash:{name:"Palash Chabukdhara",color:"#f44336"}
+};
+
+const map=L.map("map").setView([26.2006,92.9376],13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+
+const markers={},polylines={},runnerData={};
+Object.keys(runners).forEach(id=>{
+ runnerData[id]={distance:0,elapsedMs:0,sessionStart:null,lastTime:null,lastPosition:null,route:[],status:"waiting"};
+ polylines[id]=L.polyline([],{color:runners[id].color,weight:5,opacity:.75}).addTo(map);
+});
+
+function distanceKm(a,b,c,d){
+ const R=6371,dLat=(c-a)*Math.PI/180,dLon=(d-b)*Math.PI/180;
+ const x=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2;
+ return R*(2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)));
+}
+function formatTime(ms){
+ let s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+ return h?String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0"):
+ String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
+}
+function paceText(ms,km){
+ if(km<=0)return "--";
+ const mins=(ms/60000)/km, m=Math.floor(mins), s=Math.round((mins-m)*60);
+ return (s===60?m+1:m)+":"+String(s===60?0:s).padStart(2,"0")+" /KM";
+}
+function elapsedNow(d){
+ return Number(d.elapsedMs||0)+(d.status==="running"&&d.sessionStart?Math.max(0,Date.now()-Number(d.sessionStart)):0);
+}
+function saveSelected(id){
+ try{id?localStorage.setItem(LOCAL_KEY,id):localStorage.removeItem(LOCAL_KEY)}catch(e){}
+}
+function selectedSaved(){
+ try{const x=localStorage.getItem(LOCAL_KEY);return runners[x]?x:null}catch(e){return null}
+}
+function syncLocalFromFirebase(id,d){
+ runnerData[id]={
+  distance:Math.min(TARGET_DISTANCE,Number(d.distance||0)),
+  elapsedMs:Number(d.elapsedMs||0),
+  sessionStart:d.status==="running"?Number(d.sessionStart||0):null,
+  lastTime:Number(d.updatedAt||Date.now()),
+  lastPosition:(d.latitude!=null&&d.longitude!=null)?{lat:Number(d.latitude),lon:Number(d.longitude)}:null,
+  route:Array.isArray(d.route)?d.route:[],
+  status:d.status||"waiting"
+ };
+}
+
+let currentRunner=null,watchId=null,timerInterval=null,heartbeatInterval=null,raceRunning=false,latestRaceData={};
+
+function updateMyStats(){
+ if(!currentRunner)return;
+ const d=runnerData[currentRunner]||runnerData.dhiraj;
+ const km=Math.min(TARGET_DISTANCE,Number(d.distance||0)),p=Math.min(100,km/TARGET_DISTANCE*100),remain=Math.max(0,TARGET_DISTANCE-km);
+ const ms=elapsedNow(d);
+ document.getElementById("myDistance").textContent=km.toFixed(2)+" KM";
+ document.getElementById("myRemaining").textContent=remain.toFixed(2)+" KM";
+ document.getElementById("myProgress").style.width=p+"%";
+ document.getElementById("progressText").textContent=p.toFixed(0)+"%";
+ document.getElementById("myTime").textContent=formatTime(ms);
+ document.getElementById("myPace").textContent=paceText(ms,km);
+}
+
+async function saveRunner(id,extra){
+ const d=runnerData[id];
+ if(!d)return;
+ const payload={
+  name:runners[id].name,status:d.status,
+  distance:Number(Math.min(TARGET_DISTANCE,d.distance||0)),
+  elapsedMs:Number(d.elapsedMs||0),
+  sessionStart:d.status==="running"?Number(d.sessionStart||0):null,
+  updatedAt:Date.now(),
+  latitude:d.lastPosition?d.lastPosition.lat:null,
+  longitude:d.lastPosition?d.lastPosition.lon:null,
+  accuracy:extra&&extra.accuracy!=null?Number(extra.accuracy):(latestRaceData[id]?.accuracy||null),
+  route:d.route||[]
+ };
+ try{await db.ref("race/runners/"+id).update(payload)}catch(e){console.error(e)}
+}
+
+function setStatus(text,cls){
+ const el=document.getElementById("status");el.className="status "+(cls||"");el.textContent=text;
+}
+
+document.getElementById("runnerSelect").addEventListener("change",()=>{
+ const id=document.getElementById("runnerSelect").value;
+ if(id){currentRunner=id;saveSelected(id);loadMyRunner(id,latestRaceData[id]||runnerData[id]);}
+});
+
+async function startRace(){
+ const id=document.getElementById("runnerSelect").value;
+ if(!id){alert("Please select your name first.");return}
+ if(!navigator.geolocation){alert("GPS is not supported on this device.");return}
+ currentRunner=id;saveSelected(id);
+ let d=runnerData[id]||{distance:0,elapsedMs:0,sessionStart:null,lastPosition:null,route:[],status:"waiting"};
+ if(d.status==="finished" && d.distance>=TARGET_DISTANCE){
+   alert("You already finished 3 KM. Reset the race from Firebase before starting a new race.");
+   return;
+ }
+ d.status="running";
+ // RESUME: keep previously accumulated elapsed time; only start a new active session clock.
+ d.sessionStart=Date.now();
+ d.lastTime=Date.now();
+ // Always acquire a fresh GPS anchor when starting/resuming. This prevents an old
+ // Firebase location from being compared with the new GPS fix and rejected as a jump.
+ d.lastPosition=null; // next good fix becomes new anchor; NO distance is added
+ if(!Array.isArray(d.route))d.route=[];
+ runnerData[id]=d;raceRunning=true;
+ await saveRunner(id);
+ setStatus("🟢 LIVE GPS TRACKING ACTIVE","running");
+ document.getElementById("startBtn").disabled=true;
+ document.getElementById("stopBtn").disabled=false;
+ document.getElementById("runnerSelect").disabled=true;
+ startTimer();
+ if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+ watchId=navigator.geolocation.watchPosition(handlePosition,handleGPSerror,{
+  enableHighAccuracy:true,maximumAge:0,timeout:20000
+ });
+ clearInterval(heartbeatInterval);
+ heartbeatInterval=setInterval(publishHeartbeat,HEARTBEAT_MS);
+ updateMyStats();
+}
+document.getElementById("startBtn").addEventListener("click",startRace);
+
+async function handlePosition(pos){
+ if(!currentRunner||!raceRunning)return;
+ const lat=Number(pos.coords.latitude),lon=Number(pos.coords.longitude),acc=Number(pos.coords.accuracy);
+ if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+ if(acc>MAX_ACCURACY){
+  setStatus("📡 GPS accuracy low ("+Math.round(acc)+"m) — waiting for stable GPS...","running");
+  return;
+ }
+ const d=runnerData[currentRunner],now=Date.now();
+ if(!d.lastPosition){
+  d.lastPosition={lat,lon};d.lastTime=now;
+  if(!d.route.length)d.route=[[lat,lon]];
+  await saveRunner(currentRunner,{accuracy:acc});updateMyStats();return;
+ }
+ const seg=distanceKm(d.lastPosition.lat,d.lastPosition.lon,lat,lon);
+ const meters=seg*1000,seconds=Math.max(.5,(now-d.lastTime)/1000),speed=seg/seconds*3600;
+ if(meters<MIN_MOVE_METERS){
+  // Do NOT change anchor. This prevents stationary GPS jitter from accumulating.
+  d.lastTime=now;
+  await saveRunner(currentRunner,{accuracy:acc});
+  return;
+ }
+ if(speed>MAX_SPEED_KMH){
+  // Do not add this suspicious segment, but re-anchor to the newest GPS fix.
+  // Without re-anchoring, one bad/old GPS point can cause every later fix to be
+  // rejected forever as a "GPS jump".
+  d.lastPosition={lat,lon};
+  d.lastTime=now;
+  await saveRunner(currentRunner,{accuracy:acc});
+  setStatus("📡 GPS jump ignored — GPS re-anchored, waiting for stable location...","running");
+  return;
+ }
+ d.distance=Math.min(TARGET_DISTANCE,d.distance+seg);
+ d.lastPosition={lat,lon};d.lastTime=now;
+ const last=d.route[d.route.length-1];
+ if(!last||distanceKm(last[0],last[1],lat,lon)*1000>=MIN_MOVE_METERS)d.route.push([lat,lon]);
+ await saveRunner(currentRunner,{accuracy:acc});
+ updateMyStats();
+ if(d.distance>=TARGET_DISTANCE){await finishRace(true)}
+}
+
+function handleGPSerror(e){
+ if(e.code===1)setStatus("❌ Location permission denied. Allow precise location.","running");
+ else if(e.code===2)setStatus("📡 Location unavailable. Turn Location ON.","running");
+ else if(e.code===3)setStatus("⏱️ GPS timeout. Keep GPS ON and move to an open area.","running");
+ else setStatus("📡 GPS error.","running");
+}
+
+async function pauseRace(){
+ if(!currentRunner||!raceRunning)return;
+ const d=runnerData[currentRunner];
+ d.elapsedMs=elapsedNow(d);
+ d.sessionStart=null;d.status="paused";raceRunning=false;
+ if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}
+ clearInterval(timerInterval);clearInterval(heartbeatInterval);timerInterval=null;heartbeatInterval=null;
+ await saveRunner(currentRunner);
+ setStatus("⏸ RACE PAUSED — press START / RESUME to continue","paused");
+ document.getElementById("startBtn").disabled=false;
+ document.getElementById("stopBtn").disabled=true;
+ document.getElementById("runnerSelect").disabled=false;
+ updateMyStats();
+}
+document.getElementById("stopBtn").addEventListener("click",pauseRace);
+
+async function finishRace(auto=false){
+ if(!currentRunner)return;
+ const d=runnerData[currentRunner];
+ if(raceRunning)d.elapsedMs=elapsedNow(d);
+ d.sessionStart=null;d.status="finished";d.distance=Math.min(TARGET_DISTANCE,d.distance);
+ raceRunning=false;
+ if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}
+ clearInterval(timerInterval);clearInterval(heartbeatInterval);timerInterval=null;heartbeatInterval=null;
+ await saveRunner(currentRunner);
+ setStatus(auto?"🏁 3 KM COMPLETED!":"🏁 RACE FINISHED","finished");
+ document.getElementById("startBtn").disabled=false;
+ document.getElementById("stopBtn").disabled=true;
+ document.getElementById("runnerSelect").disabled=false;
+ updateMyStats();
+}
+
+function startTimer(){
+ clearInterval(timerInterval);
+ timerInterval=setInterval(()=>{if(raceRunning)updateMyStats();renderLeaderboard()},1000);
+ updateMyStats();
+}
+
+async function publishHeartbeat(){
+ if(!currentRunner||!raceRunning)return;
+ const d=runnerData[currentRunner];
+ try{
+  await db.ref("race/runners/"+currentRunner).update({
+   status:"running",elapsedMs:Number(d.elapsedMs||0),sessionStart:Number(d.sessionStart||Date.now()),
+   distance:Number(Math.min(TARGET_DISTANCE,d.distance||0)),updatedAt:Date.now()
+  });
+ }catch(e){console.error("heartbeat",e)}
+}
+
+function updateRunnerOnMap(id,data){
+ if(data.latitude==null||data.longitude==null)return;
+ const lat=Number(data.latitude),lon=Number(data.longitude);
+ if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+ const ll=[lat,lon];
+ if(!markers[id]){
+  const icon=L.divIcon({className:"",html:'<div style="width:30px;height:30px;border-radius:50%;background:'+runners[id].color+';border:4px solid white;box-shadow:0 3px 15px #000"></div>',iconSize:[30,30],iconAnchor:[15,15]});
+  markers[id]=L.marker(ll,{icon}).addTo(map);
+ }else markers[id].setLatLng(ll);
+ const age=Date.now()-Number(data.updatedAt||0);
+ markers[id].setPopupContent("<b>"+runners[id].name+"</b><br>Distance: "+Number(data.distance||0).toFixed(2)+" KM<br>Status: "+(data.status||"waiting")+(age>STALE_MS?"<br>⚠️ signal old":""));
+ if(Array.isArray(data.route))polylines[id].setLatLngs(data.route);
+}
+
+function renderLeaderboard(){
+ const list=Object.keys(runners).map(id=>{
+  const r=latestRaceData[id]||{};
+  return {id,name:runners[id].name,color:runners[id].color,distance:Number(r.distance||0),status:r.status||"waiting",
+    elapsed:Number(r.elapsedMs||0),sessionStart:Number(r.sessionStart||0),updatedAt:Number(r.updatedAt||0)};
+ });
+ list.sort((a,b)=>{
+  const ad=a.distance,bd=b.distance;
+  if(Math.abs(bd-ad)>0.0001)return bd-ad;
+  const ae=(a.status==="running"?a.elapsed+Math.max(0,Date.now()-a.sessionStart):a.elapsed);
+  const be=(b.status==="running"?b.elapsed+Math.max(0,Date.now()-b.sessionStart):b.elapsed);
+  if(a.status==="finished"&&b.status!=="finished")return -1;
+  if(b.status==="finished"&&a.status!=="finished")return 1;
+  if(ae>0&&be>0)return ae-be;
+  return a.name.localeCompare(b.name);
+ });
+ document.getElementById("leaderboard").innerHTML=list.map((r,i)=>{
+  const pct=Math.min(100,r.distance/TARGET_DISTANCE*100),ms=r.status==="running"?r.elapsed+Math.max(0,Date.now()-r.sessionStart):r.elapsed;
+  const st=r.status==="finished"?"🏁 FINISHED":r.status==="running"?"🟢 LIVE":r.status==="paused"?"⏸ PAUSED":"⚪ WAITING";
+  const age=r.updatedAt?Date.now()-r.updatedAt:Infinity;
+  const net=r.status==="running"&&age>STALE_MS?" • ⚠️ SIGNAL":"";
+  return '<div class="runner-row"><div class="rank">'+(i+1)+'</div><div><div class="runner-name"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+r.color+';margin-right:6px"></span>'+r.name+'</div><div class="runner-info">'+st+net+' • '+pct.toFixed(0)+'% • '+(ms?formatTime(ms):"--")+'</div></div><div class="runner-distance">'+r.distance.toFixed(2)+' KM<small>'+Math.max(0,TARGET_DISTANCE-r.distance).toFixed(2)+' KM left</small></div></div>';
+ }).join("");
+}
+
+function loadMyRunner(id,data){
+ if(!data)return;
+ syncLocalFromFirebase(id,data);
+ const d=runnerData[id];
+ document.getElementById("runnerSelect").value=id;
+ updateMyStats();
+ if(data.status==="running"){
+  setStatus("🟢 LIVE GPS TRACKING ACTIVE","running");
+ }else if(data.status==="paused"){
+  setStatus("⏸ RACE PAUSED — press START / RESUME","paused");
+ }else if(data.status==="finished"){
+  setStatus("🏁 RACE FINISHED","finished");
+ }else{
+  setStatus("Select START to begin.","");
+ }
+}
+
+function resumeOnLoad(){
+ const id=selectedSaved();
+ if(!id)return;
+ document.getElementById("runnerSelect").value=id;
+ if(!latestRaceData[id])return;
+ loadMyRunner(id,latestRaceData[id]);
+ const d=latestRaceData[id];
+ currentRunner=id;
+ if(d.status==="running"){
+  // Reconnect after refresh without resetting distance or elapsed time.
+  // The previous Firebase coordinate may be stale, so force a fresh GPS anchor.
+  raceRunning=true;
+  runnerData[id].lastPosition=null;
+  runnerData[id].lastTime=Date.now();
+  document.getElementById("startBtn").disabled=true;
+  document.getElementById("stopBtn").disabled=false;
+  document.getElementById("runnerSelect").disabled=true;
+  startTimer();
+  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+  watchId=navigator.geolocation.watchPosition(handlePosition,handleGPSerror,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  clearInterval(heartbeatInterval);
+  heartbeatInterval=setInterval(publishHeartbeat,HEARTBEAT_MS);
+ }
+}
+
+db.ref("race/runners").on("value",snap=>{
+ latestRaceData=snap.val()||{};
+ Object.keys(runners).forEach(id=>{
+  if(latestRaceData[id]){
+   // While this phone is actively tracking, do NOT replace its local GPS
+   // anchor/route with the Firebase snapshot every second. Doing that can
+   // make small movements look like repeated zero-distance segments.
+   if(!(id===currentRunner && raceRunning)){
+    syncLocalFromFirebase(id,latestRaceData[id]);
+   } else {
+    const remote=latestRaceData[id];
+    // Keep authoritative local distance/route, but accept remote metadata.
+    runnerData[id].status=remote.status||runnerData[id].status;
+    runnerData[id].updatedAt=Number(remote.updatedAt||Date.now());
+   }
+   updateRunnerOnMap(id,latestRaceData[id]);
+  }
+ });
+ renderLeaderboard();
+ if(!currentRunner)resumeOnLoad();
+ else if(!raceRunning&&latestRaceData[currentRunner])loadMyRunner(currentRunner,latestRaceData[currentRunner]);
+});
+
+setInterval(renderLeaderboard,1000);
+setInterval(()=>{
+ if(currentRunner&&raceRunning)updateMyStats();
+},1000);
+
+/* ===================== EMERGENCY VOICE: WebRTC + Firebase SIGNALING ===================== */
+let voicePc={},voiceLocalStream=null,voiceActive=false;
+const voiceClientId="v_"+Math.random().toString(36).slice(2)+Date.now();
+const voiceRef=db.ref("race/"+VOICE_ROOM);
+const ICE={iceServers:[
+ {urls:"stun:stun.l.google.com:19302"},
+ {urls:"stun:stun1.l.google.com:19302"}
+]};
+
+function voiceSet(text){document.getElementById("voiceState").textContent=text}
+
+async function ensureMic(){
+ if(voiceLocalStream)return voiceLocalStream;
+ voiceLocalStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
+ return voiceLocalStream;
+}
+function closeVoicePeer(id){
+ if(voicePc[id]){try{voicePc[id].close()}catch(e){}delete voicePc[id]}
+}
+function createVoicePeer(remoteId){
+ if(voicePc[remoteId])return voicePc[remoteId];
+ const pc=new RTCPeerConnection(ICE);
+ voicePc[remoteId]=pc;
+ if(voiceLocalStream)voiceLocalStream.getTracks().forEach(t=>pc.addTrack(t,voiceLocalStream));
+ pc.onicecandidate=e=>{
+  if(e.candidate)voiceRef.child("signals").child(remoteId).child(voiceClientId).push({from:voiceClientId,type:"candidate",candidate:e.candidate.toJSON()});
+ };
+ pc.ontrack=e=>{
+  let audio=document.getElementById("audio_"+remoteId);
+  if(!audio){audio=document.createElement("audio");audio.id="audio_"+remoteId;audio.autoplay=true;audio.playsInline=true;audio.controls=false;audio.style.display="none";document.body.appendChild(audio)}
+  audio.srcObject=e.streams[0];audio.play().catch(()=>{});
+ };
+ pc.onconnectionstatechange=()=>{if(["failed","closed","disconnected"].includes(pc.connectionState))voiceSet("🎙️ Voice connection changed. Try speaking again if needed.")};
+ return pc;
+}
+
+async function voiceOfferAll(){
+ if(!currentRunner)return;
+ const participants=Object.keys(runners).filter(id=>id!==currentRunner);
+ for(const remoteId of participants){
+  try{
+   const pc=createVoicePeer(remoteId);
+   const offer=await pc.createOffer({offerToReceiveAudio:true});
+   await pc.setLocalDescription(offer);
+   await voiceRef.child("signals").child(remoteId).child(voiceClientId).push({from:voiceClientId,type:"offer",sdp:offer.sdp});
+  }catch(e){console.error("voice offer",e)}
+ }
+}
+
+voiceRef.child("signals").on("child_added",snap=>{
+ const remoteBucket=snap.ref;
+ const remoteId=snap.key;
+ if(remoteId!==voiceClientId)return;
+ remoteBucket.on("child_added",async msg=>{
+  const s=msg.val(); if(!s||s.from===voiceClientId)return;
+  const from=s.from;
+  try{
+   if(s.type==="offer"){
+    const pc=createVoicePeer(from);
+    await pc.setRemoteDescription({type:"offer",sdp:s.sdp});
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    await voiceRef.child("signals").child(from).child(voiceClientId).push({from:voiceClientId,type:"answer",sdp:ans.sdp});
+   }else if(s.type==="answer"){
+    const pc=voicePc[from]; if(pc)await pc.setRemoteDescription({type:"answer",sdp:s.sdp});
+   }else if(s.type==="candidate"){
+    const pc=voicePc[from]; if(pc&&s.candidate)await pc.addIceCandidate(new RTCIceCandidate(s.candidate));
+   }
+  }catch(e){console.error("voice signal",e)}
+ });
+});
+
+async function startVoice(){
+ if(!currentRunner){alert("Please select your name first.");return}
+ try{
+  await ensureMic();
+  voiceActive=true;
+  document.getElementById("voiceBtn").classList.add("speaking");
+  document.getElementById("voiceBtn").textContent="🔴 SPEAKING — RELEASE TO STOP";
+  voiceSet("🔴 Emergency voice is LIVE to connected participants.");
+  await voiceOfferAll();
+ }catch(e){
+  alert("Microphone permission is required: "+e.message);
+  voiceSet("Microphone permission not granted.");
+ }
+}
+function stopVoice(){
+ voiceActive=false;
+ const b=document.getElementById("voiceBtn");b.classList.remove("speaking");b.textContent="🎙️ HOLD TO SPEAK";
+ voiceSet("Voice ready. Press and hold again if needed.");
+}
+const vb=document.getElementById("voiceBtn");
+vb.addEventListener("pointerdown",e=>{e.preventDefault();startVoice()});
+["pointerup","pointercancel","pointerleave"].forEach(ev=>vb.addEventListener(ev,e=>{e.preventDefault();stopVoice()}));
+window.addEventListener("beforeunload",()=>{
+ try{
+  if(voiceLocalStream)voiceLocalStream.getTracks().forEach(t=>t.stop());
+  Object.keys(voicePc).forEach(closeVoicePeer);
+ }catch(e){}
+});
+</script>
+</body>
+</html>
